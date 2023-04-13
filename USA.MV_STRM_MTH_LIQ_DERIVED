@@ -1,0 +1,165 @@
+BEGIN
+    EXECUTE IMMEDIATE 'DROP MATERIALIZED VIEW ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED';
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END;
+CREATE MATERIALIZED VIEW ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED 
+(MV_RFRSH_DATE,
+CLASS_NAME,
+OBJECT_ID,
+OBJECT_CODE,
+DAYTIME,
+SORT_ORDER,
+STREAM_NAME,
+GRS_VOL,
+GRS_VOL_UOM,
+NET_VOL,
+NET_VOL_UOM,
+STREAM_TYPE,
+GRS_VOL_CNVRT,
+GRS_VOL_CNVRT_UOM,
+NET_VOL_CNVRT,
+NET_VOL_CNVRT_UOM,
+RECORD_STATUS,
+CREATED_DATE,
+LAST_UPDATED_DATE,
+REV_NO,
+REV_TEXT)
+TABLESPACE DATA01
+PCTUSED    0
+PCTFREE    10
+INITRANS   2
+MAXTRANS   255
+STORAGE    (
+            INITIAL          64K
+            NEXT             1M
+            MINEXTENTS       1
+            MAXEXTENTS       UNLIMITED
+            PCTINCREASE      0
+            BUFFER_POOL      DEFAULT
+            FLASH_CACHE      DEFAULT
+            CELL_FLASH_CACHE DEFAULT
+           )
+NOCACHE
+NOLOGGING
+NOCOMPRESS
+NOPARALLEL
+BUILD IMMEDIATE
+REFRESH FORCE ON DEMAND
+WITH PRIMARY KEY
+AS 
+/* Formatted on 24-Mar-23 3:11:20 PM (QP5 v5.227.12220.39724) */
+WITH UOM
+     AS (SELECT CLASS_NAME, ATTRIBUTE_NAME, UNIT
+           FROM Z_UOM
+          WHERE ATTRIBUTE_NAME IN ('GRS_VOL', 'NET_VOL'))
+SELECT SYSDATE AS MV_RFRSH_DATE,
+       A.CLASS_NAME,
+       A.OBJECT_ID,
+       A.OBJECT_CODE,
+       A.DAYTIME,
+       A.SORT_ORDER,
+       A.STREAM_NAME,
+       A.GRS_VOL,
+       B.UNIT AS GRS_VOL_UOM,
+       A.NET_VOL,
+       C.UNIT AS NET_VOL_UOM,
+       A.STREAM_TYPE,
+       (CASE
+           WHEN ECDP_STREAM.getStreamPhase (A.OBJECT_ID) = 'GAS'
+           THEN
+              ecdp_unit.CONVERTVALUE (A.GRS_VOL,
+                                      'SM3',
+                                      'KSCF',
+                                      A.DAYTIME)
+           WHEN ECDP_STREAM.getStreamPhase (A.OBJECT_ID) IN ('OIL', 'WAT')
+           THEN
+              ecdp_unit.CONVERTVALUE (A.GRS_VOL,
+                                      'SM3',
+                                      'KBBL',
+                                      A.DAYTIME)
+           ELSE
+              NULL
+        END)
+          AS GRS_VOL_CNVRT,
+       (CASE
+           WHEN ECDP_STREAM.getStreamPhase (A.OBJECT_ID) = 'GAS'
+           THEN
+              'KSCF'
+           WHEN ECDP_STREAM.getStreamPhase (A.OBJECT_ID) IN ('OIL', 'WAT')
+           THEN
+              'KBBL'
+           ELSE
+              NULL
+        END)
+          AS GRS_VOL_CNVRT_UOM,
+       (CASE
+           WHEN ecDP_STREAM.getStreamPhase (A.OBJECT_ID) = 'GAS'
+           THEN
+              ecdp_unit.CONVERTVALUE (A.NET_VOL,
+                                      'SM3',
+                                      'KSCF',
+                                      A.DAYTIME)
+           WHEN ecDP_STREAM.getStreamPhase (A.OBJECT_ID) IN ('OIL', 'WAT')
+           THEN
+              ecdp_unit.CONVERTVALUE (A.NET_VOL,
+                                      'SM3',
+                                      'KBBL',
+                                      A.DAYTIME)
+           ELSE
+              NULL
+        END)
+          AS NET_VOL_CNVRT,
+       (CASE
+           WHEN ecDP_STREAM.getStreamPhase (A.OBJECT_ID) = 'GAS'
+           THEN
+              'KSCF'
+           WHEN ecDP_STREAM.getStreamPhase (A.OBJECT_ID) IN ('OIL', 'WAT')
+           THEN
+              'KBBL'
+           ELSE
+              NULL
+        END)
+          AS NET_VOL_CNVRT_UOM,
+       A.RECORD_STATUS,
+       A.CREATED_DATE,
+       A.LAST_UPDATED_DATE,
+       A.REV_NO,
+       A.REV_TEXT
+  FROM DV_STRM_MTH_LIQ_DERIVED A
+       LEFT OUTER JOIN UOM B
+          ON A.CLASS_NAME = B.CLASS_NAME AND B.ATTRIBUTE_NAME = 'GRS_VOL'
+       LEFT OUTER JOIN UOM C
+          ON A.CLASS_NAME = C.CLASS_NAME AND C.ATTRIBUTE_NAME = 'NET_VOL';
+
+
+COMMENT ON MATERIALIZED VIEW ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED IS 'snapshot table for snapshot ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED';
+
+CREATE OR REPLACE SYNONYM ENERGYX_USA.MV_STRM_MTH_LIQ_DERIVED FOR ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED;
+
+CREATE OR REPLACE SYNONYM EMECCT.MV_STRM_MTH_LIQ_DERIVED FOR ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED;
+
+CREATE OR REPLACE SYNONYM DASHBOARD.MV_STRM_MTH_LIQ_DERIVED FOR ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED;
+
+CREATE UNIQUE INDEX ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED_PK ON ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED
+(OBJECT_ID, DAYTIME)
+LOGGING
+TABLESPACE DATA01
+PCTFREE    10
+INITRANS   2
+MAXTRANS   255
+STORAGE    (
+            INITIAL          64K
+            NEXT             1M
+            MINEXTENTS       1
+            MAXEXTENTS       UNLIMITED
+            PCTINCREASE      0
+            BUFFER_POOL      DEFAULT
+            FLASH_CACHE      DEFAULT
+            CELL_FLASH_CACHE DEFAULT
+           )
+NOPARALLEL;
+
+GRANT READ ON ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED TO APP_READ_ROLE_USA;
+
+GRANT DELETE, INSERT, SELECT, UPDATE ON ECKERNEL_USA.MV_STRM_MTH_LIQ_DERIVED TO APP_WRITE_ROLE_USA;
